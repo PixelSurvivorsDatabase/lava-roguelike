@@ -218,6 +218,7 @@ class StormforgeGame {
     this.currentWeather = null;
     this.weatherTimer = 0;
     this.weatherTick = 0;
+    this.queuedWeather = null;
     this.floor = 1;
     this.room = 1;
     this.roomPlan = [];
@@ -444,6 +445,14 @@ class StormforgeGame {
     } else {
       this.spawnWave(this.currentRoomType === 'elite');
       this.setCodex(this.currentRoomType === 'elite' ? 'Codex Buddy: Elite room. One enemy got premium WiFi.' : 'Codex Buddy: Combat room. Standard tax-free violence.');
+    }
+
+    if (this.queuedWeather && ['combat', 'elite', 'boss'].includes(this.currentRoomType)) {
+      this.currentWeather = this.queuedWeather;
+      this.weatherTimer = 15;
+      this.weatherTick = 0.2;
+      this.queuedWeather = null;
+      this.toasts.show('Queued chaos weather activated.', 'warn');
     }
   }
 
@@ -697,9 +706,7 @@ class StormforgeGame {
         desc: 'Gain 8 coins, start a lightning storm, and lightning prefers enemies.',
         action: () => {
           this.player.coins += 8;
-          this.currentWeather = 'lightning';
-          this.weatherTimer = 15;
-          this.weatherTick = 0.2;
+          this.queuedWeather = 'lightning';
           this.nextRoom();
         }
       },
@@ -1403,7 +1410,7 @@ class StormforgeGame {
     this.ui.floorText.textContent = `Floor ${this.floor}-${this.room} • ${this.currentRoomType}`;
     this.ui.coinText.textContent = `${p.coins}`;
     this.ui.shardText.textContent = `${p.shards}`;
-    this.ui.companionText.textContent = this.companions.length ? `Axolotl Lv.${this.companions[0].level}` : 'None';
+    if (this.ui.companionText) this.ui.companionText.textContent = this.companions.length ? `Axolotl Lv.${this.companions[0].level}` : 'None';
     if (this.state === 'playing') this.ui.objective.textContent = this.enemies.length ? `${this.enemies.length} enemies left` : 'Room clear';
   }
 
