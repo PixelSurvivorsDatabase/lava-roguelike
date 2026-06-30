@@ -1,5 +1,7 @@
+
 import * as THREE from 'three';
 import './style.css';
+import './v02.css';
 
 const STORAGE_KEY = 'lavaRoguelikeStormforgeAbyss';
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -13,15 +15,51 @@ const dist2 = (a, b) => {
   return dx * dx + dz * dz;
 };
 
-const BALANCE = {
-  playerBaseHp: 125,
-  playerSpeed: 9.2,
-  enemyWaveBase: 2,
-  eliteChance: 0.04,
-  weatherChance: 0.18,
-  enemyDamageMult: 0.72,
-  enemySpeedMult: 0.82,
-  enemyHpMult: 0.82
+const DIFFICULTIES = {
+  casual: {
+    label: 'Casual Rift',
+    playerHp: 135,
+    enemyHp: 0.78,
+    enemyDamage: 0.64,
+    enemySpeed: 0.76,
+    waveBonus: -1,
+    eliteChance: 0.03,
+    weatherChance: 0.13,
+    coinBonus: 0
+  },
+  normal: {
+    label: 'Normal Rift',
+    playerHp: 125,
+    enemyHp: 0.95,
+    enemyDamage: 0.86,
+    enemySpeed: 0.9,
+    waveBonus: 0,
+    eliteChance: 0.06,
+    weatherChance: 0.22,
+    coinBonus: 1
+  },
+  abyss: {
+    label: 'Abyss Rift',
+    playerHp: 110,
+    enemyHp: 1.18,
+    enemyDamage: 1.05,
+    enemySpeed: 1.02,
+    waveBonus: 1,
+    eliteChance: 0.12,
+    weatherChance: 0.34,
+    coinBonus: 2
+  },
+  skill: {
+    label: 'Skill Issue Mode',
+    playerHp: 115,
+    enemyHp: 1.05,
+    enemyDamage: 0.96,
+    enemySpeed: 0.98,
+    waveBonus: 1,
+    eliteChance: 0.09,
+    weatherChance: 0.5,
+    coinBonus: 2
+  }
 };
 
 const defaultSave = {
@@ -114,6 +152,7 @@ class StormforgeGame {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x070912);
     this.scene.fog = new THREE.Fog(0x070912, 34, 105);
+
     this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 180);
     this.clock = new THREE.Clock();
     this.raycaster = new THREE.Raycaster();
@@ -128,7 +167,10 @@ class StormforgeGame {
     this.state = 'menu';
     this.nextId = 1;
     this.screenShake = 0;
+    this.difficultyKey = 'casual';
+    this.balance = DIFFICULTIES.casual;
     this.clearLists();
+
     this.setupScene();
     this.setupMenu();
     this.bindButtons();
@@ -142,6 +184,8 @@ class StormforgeGame {
     return {
       menu: document.querySelector('#menu'),
       reward: document.querySelector('#reward'),
+      rewardTitle: document.querySelector('#rewardTitle'),
+      rewardDesc: document.querySelector('#rewardDesc'),
       rewardCards: document.querySelector('#rewardCards'),
       gameover: document.querySelector('#gameover'),
       hpBar: document.querySelector('#hpBar'),
@@ -153,12 +197,14 @@ class StormforgeGame {
       floorText: document.querySelector('#floorText'),
       coinText: document.querySelector('#coinText'),
       shardText: document.querySelector('#shardText'),
+      companionText: document.querySelector('#companionText'),
       relicList: document.querySelector('#relicList'),
       objective: document.querySelector('#objective'),
       codex: document.querySelector('#codexLine'),
       runStats: document.querySelector('#runStats'),
       saveStats: document.querySelector('#saveStats'),
-      upgradeButtons: document.querySelector('#upgradeButtons')
+      upgradeButtons: document.querySelector('#upgradeButtons'),
+      difficultySelect: document.querySelector('#difficultySelect')
     };
   }
 
@@ -168,9 +214,16 @@ class StormforgeGame {
     this.pickups = [];
     this.effects = [];
     this.puddles = [];
+    this.companions = [];
     this.currentWeather = null;
     this.weatherTimer = 0;
     this.weatherTick = 0;
+    this.floor = 1;
+    this.room = 1;
+    this.roomPlan = [];
+    this.currentRoomType = 'combat';
+    this.coinsEarned = 0;
+    this.shardsEarned = 0;
   }
 
   createMaterials() {
@@ -184,6 +237,7 @@ class StormforgeGame {
       enemyBat: new THREE.MeshStandardMaterial({ color: 0x66d9ff, emissive: 0x064070, emissiveIntensity: 0.5, roughness: 0.45 }),
       enemyDrone: new THREE.MeshStandardMaterial({ color: 0xb6bac9, metalness: 0.45, roughness: 0.38 }),
       enemyBoss: new THREE.MeshStandardMaterial({ color: 0xb55cff, emissive: 0x220033, emissiveIntensity: 0.45, roughness: 0.4 }),
+      companion: new THREE.MeshStandardMaterial({ color: 0x4effb4, emissive: 0x0d7a4f, emissiveIntensity: 0.55, roughness: 0.5 }),
       coin: new THREE.MeshStandardMaterial({ color: 0xffce32, emissive: 0x9b5d00, emissiveIntensity: 0.65, roughness: 0.35, metalness: 0.2 }),
       shard: new THREE.MeshStandardMaterial({ color: 0xbd7bff, emissive: 0x4a1399, emissiveIntensity: 0.65, roughness: 0.2 }),
       lava: new THREE.MeshStandardMaterial({ color: 0xff4812, emissive: 0xff2600, emissiveIntensity: 1.35, roughness: 0.45, transparent: true, opacity: 0.82 }),
@@ -275,15 +329,16 @@ class StormforgeGame {
     return [
       { id: 'tiny-thundercloud', name: 'Tiny Thundercloud', rarity: 'common', desc: 'A tiny cloud zaps random enemies every few seconds.', apply: () => { this.player.flags.thunderCloud = true; this.player.thunderCloudTimer = 1.5; } },
       { id: 'lava-coin-magnet', name: 'Lava Coin Magnet', rarity: 'common', desc: 'Coins and shards fly toward you from much farther away.', apply: () => { this.player.flags.coinMagnet = true; } },
+      { id: 'ashfang-spark', name: 'Ashfang Spark', rarity: 'common', desc: '+2 melee damage and slashes briefly burn enemies.', apply: () => { this.player.damage += 2; this.player.flags.burningBlade = true; } },
+      { id: 'overclock-boots', name: 'Overclock Boots', rarity: 'common', desc: 'Dash cooldown is shorter. Movement demon arc begins.', apply: () => { this.player.dashCooldownMult = (this.player.dashCooldownMult || 1) * 0.82; } },
       { id: 'pocket-bidoof', name: 'Pocket Bidoof', rarity: 'rare', desc: 'Blocks one fatal hit. Makes the Abyss question its life choices.', apply: () => { this.player.flags.bidoofReady = true; } },
       { id: 'magma-heart', name: 'Magma Heart', rarity: 'rare', desc: 'Heal 25 HP now. Future heals explode into lava damage.', apply: () => { this.player.flags.magmaHeart = true; this.healPlayer(25, true); } },
-      { id: 'storm-momentum', name: 'Storm Momentum Core', rarity: 'starter', desc: 'Dashing gives temporary damage stacks. This is your first nonsense engine.', apply: () => { this.player.flags.stormMomentum = true; } },
       { id: 'magma-trail', name: 'Magma Trail', rarity: 'rare', desc: 'Dashing leaves burning lava puddles behind you.', apply: () => { this.player.flags.lavaDash = true; } },
       { id: 'void-receipt', name: 'Gravity Receipt', rarity: 'rare', desc: 'Your attacks pull enemies inward before the hit lands.', apply: () => { this.player.flags.voidPull = true; } },
+      { id: 'primal-treat-bag', name: 'Primal Treat Bag', rarity: 'rare', desc: 'Companions attack faster and hit harder.', apply: () => { this.player.flags.companionTreats = true; this.buffCompanions(); } },
       { id: 'rift-crown', name: 'Rift Crown', rarity: 'legendary', desc: 'Reward rooms offer 4 choices instead of 3, but elites appear slightly more often.', apply: () => { this.player.flags.doubleReward = true; } },
       { id: 'hyperbeam-core', name: 'Hyper Beam Core', rarity: 'legendary', desc: 'Press E to fire a huge beam. It overheats, because balance exists sometimes.', apply: () => { this.player.flags.hyperBeam = true; } },
-      { id: 'ashfang-spark', name: 'Ashfang Spark', rarity: 'common', desc: '+2 melee damage and slashes briefly burn enemies.', apply: () => { this.player.damage += 2; this.player.flags.burningBlade = true; } },
-      { id: 'overclock-boots', name: 'Overclock Boots', rarity: 'common', desc: 'Dash cooldown is shorter. Movement demon arc begins.', apply: () => { this.player.dashCooldownMult = (this.player.dashCooldownMult || 1) * 0.82; } }
+      { id: 'storm-momentum', name: 'Storm Momentum Core', rarity: 'starter', desc: 'Dashing gives temporary damage stacks. This is your first nonsense engine.', apply: () => { this.player.flags.stormMomentum = true; } }
     ];
   }
 
@@ -298,16 +353,17 @@ class StormforgeGame {
 
   startRun() {
     this.clearRunObjects();
+    this.difficultyKey = this.ui.difficultySelect?.value || 'casual';
+    this.balance = DIFFICULTIES[this.difficultyKey] || DIFFICULTIES.casual;
     this.state = 'playing';
     this.floor = 1;
     this.room = 1;
-    this.coinsEarned = 0;
-    this.shardsEarned = 0;
+    this.roomPlan = this.generateFloorPlan();
     this.ui.menu.classList.add('hidden');
     this.ui.gameover.classList.add('hidden');
     this.ui.reward.classList.add('hidden');
 
-    const maxHp = BALANCE.playerBaseHp + saveData.upgrades.heart * 10;
+    const maxHp = this.balance.playerHp + saveData.upgrades.heart * 10;
     this.player = {
       pos: new THREE.Vector3(0, 0.8, 0),
       vel: new THREE.Vector3(),
@@ -318,7 +374,7 @@ class StormforgeGame {
       energy: 100,
       xp: 0,
       level: 1,
-      coins: 0,
+      coins: this.difficultyKey === 'casual' ? 4 : 2,
       shards: 0,
       damage: 14 + saveData.upgrades.blade,
       attackCd: 0,
@@ -330,22 +386,98 @@ class StormforgeGame {
       stormStacks: 0,
       stormStackTimer: 0,
       relics: [],
-      flags: { bidoofReady: false, coinMagnet: false, thunderCloud: false, lavaDash: false, voidPull: false, doubleReward: false, hyperBeam: false, stormMomentum: false, burningBlade: false, magmaHeart: false }
+      flags: {
+        bidoofReady: false,
+        coinMagnet: false,
+        thunderCloud: false,
+        lavaDash: false,
+        voidPull: false,
+        doubleReward: false,
+        hyperBeam: false,
+        stormMomentum: false,
+        burningBlade: false,
+        magmaHeart: false,
+        companionTreats: false
+      }
     };
     this.player.mesh = this.createPlayerMesh();
     this.scene.add(this.player.mesh);
     this.addRelic(this.relicCatalog.find((r) => r.id === 'storm-momentum'), false);
-    this.spawnWave();
-    this.toasts.show('Run started. Movement fixed. Enemies nerfed.', 'good');
-    this.setCodex('Codex Buddy: A/D are fixed now. The Abyss has been nerfed for early runs.');
+    this.toasts.show(`Run started: ${this.balance.label}.`, 'good');
+    this.setCodex('Codex Buddy: v0.2 online. Random rooms, Vrotato shop, and Lava Axolotl have entered the chat.');
+    this.enterRoom();
+  }
+
+  generateFloorPlan() {
+    const middle = [];
+    for (let i = 0; i < 4; i++) {
+      middle.push(pick(['combat', 'combat', 'elite', 'shop', 'companion', 'chaos']));
+    }
+    middle[1] = Math.random() < 0.65 ? 'shop' : middle[1];
+    middle[2] = Math.random() < 0.55 ? 'companion' : middle[2];
+    return ['combat', ...middle, 'boss'];
+  }
+
+  enterRoom() {
+    this.removeRoomObjects();
+    this.currentRoomType = this.roomPlan[this.room - 1] || 'combat';
+    this.ui.reward.classList.add('hidden');
+
+    const names = {
+      combat: 'Combat Room',
+      elite: 'Elite Room',
+      shop: 'Vrotato Shop',
+      companion: 'Companion Nest',
+      chaos: 'Chaos Room',
+      boss: 'Boss Room'
+    };
+    this.ui.objective.textContent = names[this.currentRoomType] || 'Room';
+
+    if (this.currentRoomType === 'shop') this.openShop();
+    else if (this.currentRoomType === 'companion') this.openCompanionRoom();
+    else if (this.currentRoomType === 'chaos') this.openChaosRoom();
+    else if (this.currentRoomType === 'boss') {
+      this.spawnEnemy('siren', new THREE.Vector3(0, 1, -15), true);
+      this.currentWeather = 'lightning';
+      this.weatherTimer = 60;
+      this.setCodex('Codex Buddy: Boss room. The Winged Siren has arrived to scream legally.');
+    } else {
+      this.spawnWave(this.currentRoomType === 'elite');
+      this.setCodex(this.currentRoomType === 'elite' ? 'Codex Buddy: Elite room. One enemy got premium WiFi.' : 'Codex Buddy: Combat room. Standard tax-free violence.');
+    }
+  }
+
+  nextRoom() {
+    this.room += 1;
+    if (this.room > this.roomPlan.length) {
+      this.floor += 1;
+      this.room = 1;
+      this.roomPlan = this.generateFloorPlan();
+      this.toasts.show(`Floor ${this.floor}: new route generated.`, 'warn');
+    }
+    this.state = 'playing';
+    this.enterRoom();
   }
 
   clearRunObjects() {
-    const removable = [...this.enemies, ...this.enemyProjectiles, ...this.pickups, ...this.effects, ...this.puddles];
+    const removable = [...this.enemies, ...this.enemyProjectiles, ...this.pickups, ...this.effects, ...this.puddles, ...this.companions];
     if (this.player?.mesh) removable.push(this.player);
     for (const item of removable) if (item?.mesh) this.scene.remove(item.mesh);
     this.clearLists();
     this.player = null;
+  }
+
+  removeRoomObjects() {
+    const removable = [...this.enemies, ...this.enemyProjectiles, ...this.pickups, ...this.effects, ...this.puddles];
+    for (const item of removable) if (item?.mesh) this.scene.remove(item.mesh);
+    this.enemies = [];
+    this.enemyProjectiles = [];
+    this.pickups = [];
+    this.effects = [];
+    this.puddles = [];
+    this.currentWeather = null;
+    this.weatherTimer = 0;
+    this.weatherTick = 0;
   }
 
   createPlayerMesh() {
@@ -360,6 +492,21 @@ class StormforgeGame {
     blade.rotation.set(0.35, 0.2, 0.05);
     group.add(body, core, blade);
     group.position.copy(this.player.pos);
+    return group;
+  }
+
+  createCompanionMesh(level = 1) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.45, 18, 12), this.materials.companion);
+    body.scale.set(1.25, 0.65, 0.82);
+    body.position.y = 0.48;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 10), this.materials.companion);
+    head.position.set(0, 0.56, -0.48);
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.65, 10), this.materials.storm);
+    tail.rotation.x = Math.PI / 2;
+    tail.position.set(0, 0.5, 0.58);
+    group.add(body, head, tail);
+    group.scale.setScalar(1 + level * 0.08);
     return group;
   }
 
@@ -382,18 +529,9 @@ class StormforgeGame {
     }
   }
 
-  spawnWave() {
-    const bossRoom = this.floor % 5 === 0 && this.room === 3;
-    if (bossRoom) {
-      this.spawnEnemy('siren', new THREE.Vector3(0, 1, -15), true);
-      this.currentWeather = 'lightning';
-      this.weatherTimer = 60;
-      this.setCodex('Codex Buddy: Winged Siren detected. This version should be survivable now.');
-      return;
-    }
-
-    const count = BALANCE.enemyWaveBase + this.floor + Math.ceil(this.room * 0.75);
-    const eliteChance = this.player.flags.doubleReward ? 0.11 : BALANCE.eliteChance + this.floor * 0.006;
+  spawnWave(forceElite = false) {
+    const count = clamp(2 + this.floor + Math.ceil(this.room * 0.55) + this.balance.waveBonus, 2, 9);
+    const eliteChance = forceElite ? 0.45 : this.balance.eliteChance + this.floor * 0.006 + (this.player.flags.doubleReward ? 0.04 : 0);
     for (let i = 0; i < count; i++) {
       const angle = rand(0, Math.PI * 2);
       const radius = rand(11, 25);
@@ -411,9 +549,9 @@ class StormforgeGame {
     else if (type === 'siren') Object.assign(enemy, { hp: 360 + this.floor * 30, damage: 8, speed: 2.8, radius: 2.1, phase: 1 });
     else Object.assign(enemy, { hp: 22 + this.floor * 3, damage: 4, speed: 3.1 });
 
-    enemy.hp *= BALANCE.enemyHpMult;
-    enemy.damage *= BALANCE.enemyDamageMult;
-    enemy.speed *= BALANCE.enemySpeedMult;
+    enemy.hp *= this.balance.enemyHp;
+    enemy.damage *= this.balance.enemyDamage;
+    enemy.speed *= this.balance.enemySpeed;
     enemy.maxHp = enemy.hp;
 
     if (elite) {
@@ -470,8 +608,202 @@ class StormforgeGame {
     return group;
   }
 
+  openShop() {
+    this.state = 'choice';
+    this.setCodex('Vrotato Chip: Welcome. Prices are fair, legal, and emotionally damaging.');
+    this.showChoices('Vrotato Chip Shop', 'Spend Lava Coins. Or leave before bro invents sales tax.', [
+      {
+        tag: '6 coins',
+        title: 'Buy Healing Wings',
+        desc: 'Heal 35 HP. Somehow still cheaper than a tetanus shot.',
+        disabled: this.player.coins < 6 || this.player.hp >= this.player.maxHp,
+        action: () => this.buyShopItem(6, () => this.healPlayer(35, true), 'Healing purchased.')
+      },
+      {
+        tag: '12 coins',
+        title: 'Random Relic',
+        desc: 'Buy a random relic from Vrotato. Zero refunds, maximum nonsense.',
+        disabled: this.player.coins < 12,
+        action: () => this.buyShopItem(12, () => this.addRelic(this.randomRelic()), 'Mystery relic purchased.')
+      },
+      {
+        tag: '10 coins',
+        title: 'Lava Axolotl Egg',
+        desc: this.companions.length ? 'Upgrade your Lava Axolotl instead.' : 'Gain a tiny companion that bites your enemies.',
+        disabled: this.player.coins < 10,
+        action: () => this.buyShopItem(10, () => this.obtainOrUpgradeAxolotl(), 'Axolotl transaction complete.')
+      },
+      {
+        tag: 'free',
+        title: 'Leave Shop',
+        desc: 'Escape before Vrotato invents a browsing fee.',
+        action: () => this.nextRoom()
+      }
+    ]);
+  }
+
+  buyShopItem(cost, effect, message) {
+    if (this.player.coins < cost) return;
+    this.player.coins -= cost;
+    effect();
+    this.toasts.show(message, 'good');
+    this.updateUI();
+    this.openShop();
+  }
+
+  openCompanionRoom() {
+    this.state = 'choice';
+    this.setCodex('Codex Buddy: Companion nest found. Creature acquisition arc begins.');
+    this.showChoices('Companion Nest', 'Pick a beast upgrade. This is where the Lava Axolotl starts cooking.', [
+      {
+        tag: this.companions.length ? 'upgrade' : 'new',
+        title: this.companions.length ? 'Train Lava Axolotl' : 'Hatch Lava Axolotl',
+        desc: this.companions.length ? '+1 companion level, more damage, faster bites.' : 'Gain a cute axolotl that attacks enemies automatically.',
+        action: () => {
+          this.obtainOrUpgradeAxolotl();
+          this.nextRoom();
+        }
+      },
+      {
+        tag: 'bond',
+        title: 'Primal Bond',
+        desc: 'Heal 20 HP and gain +1 player damage because friendship is apparently violent.',
+        action: () => {
+          this.player.damage += 1;
+          this.healPlayer(20, true);
+          this.nextRoom();
+        }
+      },
+      {
+        tag: 'treat',
+        title: 'Mystery Treat Bag',
+        desc: 'Gain 5 coins and make any companion attack once instantly.',
+        action: () => {
+          this.player.coins += 5;
+          for (const c of this.companions) c.attackCd = 0;
+          this.nextRoom();
+        }
+      }
+    ]);
+  }
+
+  openChaosRoom() {
+    this.state = 'choice';
+    this.setCodex('Codex Buddy: Chaos room. This is either loot or regret. Usually both.');
+    this.showChoices('Chaos Room', 'Pick one event. The Abyss promises nothing.', [
+      {
+        tag: 'storm',
+        title: 'Lightning Insurance Fraud',
+        desc: 'Gain 8 coins, start a lightning storm, and lightning prefers enemies.',
+        action: () => {
+          this.player.coins += 8;
+          this.currentWeather = 'lightning';
+          this.weatherTimer = 15;
+          this.weatherTick = 0.2;
+          this.nextRoom();
+        }
+      },
+      {
+        tag: 'curse-ish',
+        title: 'Suspicious Free Relic',
+        desc: 'Gain a relic, then fight two extra elite enemies in the next combat room.',
+        action: () => {
+          this.addRelic(this.randomRelic());
+          this.player.flags.nextRoomExtraElites = true;
+          this.nextRoom();
+        }
+      },
+      {
+        tag: 'safe',
+        title: 'Pocket Reset',
+        desc: 'Heal 30 HP and refill energy. Boring, useful, alive.',
+        action: () => {
+          this.healPlayer(30, true);
+          this.player.energy = 100;
+          this.nextRoom();
+        }
+      }
+    ]);
+  }
+
+  showChoices(title, desc, choices) {
+    this.ui.rewardTitle.textContent = title;
+    this.ui.rewardDesc.textContent = desc;
+    this.ui.rewardCards.innerHTML = '';
+    for (const choice of choices) {
+      const card = document.createElement('button');
+      card.className = `reward-card ${choice.className || ''}`;
+      card.disabled = Boolean(choice.disabled);
+      card.innerHTML = `<span>${choice.tag}</span><strong>${choice.title}</strong><p>${choice.desc}</p>${choice.disabled ? '<em class="price">Not enough coins / unavailable</em>' : ''}`;
+      card.addEventListener('click', () => {
+        if (!choice.disabled) choice.action();
+      });
+      this.ui.rewardCards.appendChild(card);
+    }
+    this.ui.reward.classList.remove('hidden');
+  }
+
+  randomRelic() {
+    const pool = this.relicCatalog.filter((r) => r.rarity !== 'starter');
+    return pick(pool);
+  }
+
+  obtainOrUpgradeAxolotl() {
+    if (!this.companions.length) {
+      const comp = {
+        id: this.nextId++,
+        name: 'Lava Axolotl',
+        level: 1,
+        pos: this.player.pos.clone().add(new THREE.Vector3(-1.8, 0, 1.5)),
+        damage: this.player.flags.companionTreats ? 11 : 8,
+        attackCd: 0.3,
+        attackDelay: this.player.flags.companionTreats ? 0.9 : 1.25,
+        mesh: null
+      };
+      comp.mesh = this.createCompanionMesh(comp.level);
+      comp.mesh.position.copy(comp.pos);
+      this.scene.add(comp.mesh);
+      this.companions.push(comp);
+      this.toasts.show('Lava Axolotl joined the run.', 'good');
+    } else {
+      const comp = this.companions[0];
+      comp.level += 1;
+      comp.damage += this.player.flags.companionTreats ? 5 : 4;
+      comp.attackDelay = Math.max(0.65, comp.attackDelay - 0.12);
+      comp.mesh.scale.setScalar(1 + comp.level * 0.08);
+      this.toasts.show(`Lava Axolotl upgraded to level ${comp.level}.`, 'good');
+    }
+    this.updateUI();
+  }
+
+  buffCompanions() {
+    for (const comp of this.companions) {
+      comp.damage += 4;
+      comp.attackDelay = Math.max(0.65, comp.attackDelay * 0.82);
+    }
+  }
+
+  updateCompanions(dt) {
+    for (let i = 0; i < this.companions.length; i++) {
+      const comp = this.companions[i];
+      comp.attackCd -= dt;
+      const angle = performance.now() * 0.0015 + i * 2.1;
+      const follow = this.player.pos.clone().add(new THREE.Vector3(Math.cos(angle) * 2.2, -0.05, Math.sin(angle) * 2.2));
+      comp.pos.lerp(follow, 1 - Math.exp(-dt * 6));
+      comp.mesh.position.copy(comp.pos);
+      comp.mesh.rotation.y += dt * 2.5;
+
+      const target = this.closestEnemy(comp.pos, 13);
+      if (target && comp.attackCd <= 0) {
+        comp.attackCd = comp.attackDelay;
+        this.createLightning(comp.pos.clone().add(new THREE.Vector3(0, 0.8, 0)), target.pos.clone().add(new THREE.Vector3(0, 0.8, 0)));
+        this.damageEnemy(target, comp.damage + comp.level * 1.5, 'storm');
+      }
+    }
+  }
+
   maybeStartWeather() {
-    const chance = BALANCE.weatherChance + this.floor * 0.02;
+    const chance = this.balance.weatherChance + this.floor * 0.02;
     if (Math.random() > chance) return;
     this.currentWeather = pick(['ashfall', 'lightning', 'meteor']);
     this.weatherTimer = rand(12, 18);
@@ -481,6 +813,7 @@ class StormforgeGame {
   update(dt) {
     if (this.state !== 'playing') return;
     this.updatePlayer(dt);
+    this.updateCompanions(dt);
     this.updateEnemies(dt);
     this.updateProjectiles(dt);
     this.updatePickups(dt);
@@ -489,7 +822,7 @@ class StormforgeGame {
     this.updateWeather(dt);
     this.updateCamera(dt);
     this.updateUI();
-    if (this.enemies.length === 0 && this.state === 'playing') this.roomCleared();
+    if (this.enemies.length === 0 && this.state === 'playing' && ['combat', 'elite', 'boss'].includes(this.currentRoomType)) this.roomCleared();
   }
 
   updatePlayer(dt) {
@@ -502,6 +835,13 @@ class StormforgeGame {
     p.energy = Math.min(100, p.energy + 26 * dt);
     p.stormStackTimer = Math.max(0, p.stormStackTimer - dt);
     if (p.stormStackTimer <= 0) p.stormStacks = 0;
+
+    if (p.flags.nextRoomExtraElites && this.enemies.length && this.currentRoomType !== 'boss') {
+      p.flags.nextRoomExtraElites = false;
+      this.spawnEnemy('bat', this.randomArenaPoint().setY(0.8), true);
+      this.spawnEnemy('drone', this.randomArenaPoint().setY(0.8), true);
+      this.toasts.show('Suspicious relic debt collected: extra elites spawned.', 'warn');
+    }
 
     if (p.flags.thunderCloud) {
       p.thunderCloudTimer -= dt;
@@ -524,7 +864,7 @@ class StormforgeGame {
     if (this.input.down('a')) move.sub(right);
     if (move.lengthSq() > 0) move.normalize();
 
-    const speed = BALANCE.playerSpeed + p.stormStacks * 0.25;
+    const speed = 9.2 + p.stormStacks * 0.25;
     const targetVel = move.multiplyScalar(speed);
     p.vel.x = lerp(p.vel.x, targetVel.x, 1 - Math.exp(-dt * 14));
     p.vel.z = lerp(p.vel.z, targetVel.z, 1 - Math.exp(-dt * 14));
@@ -737,7 +1077,7 @@ class StormforgeGame {
     const idx = this.enemies.indexOf(enemy);
     if (idx !== -1) this.enemies.splice(idx, 1);
     this.scene.remove(enemy.mesh);
-    const coinCount = enemy.type === 'siren' ? 22 : enemy.elite ? randInt(3, 5) : randInt(1, 3);
+    const coinCount = enemy.type === 'siren' ? 22 : enemy.elite ? randInt(3, 5) : randInt(1, 3) + this.balance.coinBonus;
     for (let i = 0; i < coinCount; i++) this.spawnPickup('coin', enemy.pos.clone().add(new THREE.Vector3(rand(-0.8, 0.8), 0, rand(-0.8, 0.8))));
     if (enemy.elite || enemy.type === 'siren' || Math.random() < 0.08) this.spawnPickup('shard', enemy.pos.clone());
     this.createRingEffect(enemy.pos, enemy.type === 'siren' ? 7 : 2.5, enemy.type === 'siren' ? this.materials.void : this.materials.lava, 0.55);
@@ -759,7 +1099,7 @@ class StormforgeGame {
     p.combo = 0;
     this.screenShake = Math.max(this.screenShake, 0.18);
     this.floatingText(`-${Math.round(amount)} HP`, p.pos, 'player');
-    this.setCodex(`Codex Buddy: Hit by ${source}. At least it hurts less now.`);
+    this.setCodex(`Codex Buddy: Hit by ${source}. We are calling that data collection.`);
     if (p.hp <= 0) this.gameOver();
   }
 
@@ -861,7 +1201,7 @@ class StormforgeGame {
 
     if (this.currentWeather === 'lightning') {
       this.weatherTick = rand(1.0, 1.55);
-      const target = Math.random() < 0.62 && this.enemies.length ? pick(this.enemies).pos.clone() : this.randomArenaPoint();
+      const target = Math.random() < 0.72 && this.enemies.length ? pick(this.enemies).pos.clone() : this.randomArenaPoint();
       this.createDangerCircle(target, 2.3, 0.55, () => {
         this.createLightning(target.clone().add(new THREE.Vector3(0, 9, 0)), target.clone().add(new THREE.Vector3(0, 0.5, 0)));
         if (dist2(this.player.pos, target) < 6.4 && this.player.invuln <= 0) this.damagePlayer(7 + this.floor, 'weather lightning');
@@ -904,28 +1244,17 @@ class StormforgeGame {
       const relic = pick(pool);
       if (!offered.some((r) => r.id === relic.id)) offered.push(relic);
     }
-    this.ui.rewardCards.innerHTML = '';
-    for (const relic of offered) {
-      const card = document.createElement('button');
-      card.className = `reward-card ${relic.rarity}`;
-      card.innerHTML = `<span>${relic.rarity}</span><strong>${relic.name}</strong><p>${relic.desc}</p>`;
-      card.addEventListener('click', () => this.chooseReward(relic));
-      this.ui.rewardCards.appendChild(card);
-    }
-    this.ui.reward.classList.remove('hidden');
-  }
-
-  chooseReward(relic) {
-    this.ui.reward.classList.add('hidden');
-    this.addRelic(relic, true);
-    this.room += 1;
-    if (this.room > 3) {
-      this.room = 1;
-      this.floor += 1;
-      this.toasts.show(`Floor ${this.floor}: The Abyss gets madder.`, 'warn');
-    }
-    this.state = 'playing';
-    this.spawnWave();
+    this.showChoices('Choose a Relic', 'The room is clear. Pick one upgrade and push deeper into the Abyss.', offered.map((relic) => ({
+      tag: relic.rarity,
+      title: relic.name,
+      desc: relic.desc,
+      className: relic.rarity,
+      action: () => {
+        this.ui.reward.classList.add('hidden');
+        this.addRelic(relic, true);
+        this.nextRoom();
+      }
+    })));
   }
 
   gameOver() {
@@ -935,7 +1264,7 @@ class StormforgeGame {
     saveData.bestFloor = Math.max(saveData.bestFloor, this.floor);
     saveData.bestCoins = Math.max(saveData.bestCoins, this.coinsEarned);
     persistSave();
-    this.ui.runStats.innerHTML = `Floor reached: <strong>${this.floor}-${this.room}</strong><br>Coins earned: <strong>${this.coinsEarned}</strong><br>Abyss Shards gained: <strong>${this.shardsEarned}</strong><br>Best Floor: <strong>${saveData.bestFloor}</strong>`;
+    this.ui.runStats.innerHTML = `Difficulty: <strong>${this.balance.label}</strong><br>Floor reached: <strong>${this.floor}-${this.room}</strong><br>Coins earned: <strong>${this.coinsEarned}</strong><br>Abyss Shards gained: <strong>${this.shardsEarned}</strong><br>Best Floor: <strong>${saveData.bestFloor}</strong>`;
     this.ui.gameover.classList.remove('hidden');
   }
 
@@ -1062,6 +1391,7 @@ class StormforgeGame {
   }
 
   updateUI() {
+    if (!this.player) return;
     const p = this.player;
     this.ui.hpBar.style.width = `${clamp((p.hp / p.maxHp) * 100, 0, 100)}%`;
     this.ui.energyBar.style.width = `${clamp(p.energy, 0, 100)}%`;
@@ -1070,10 +1400,11 @@ class StormforgeGame {
     this.ui.hpText.textContent = `${Math.ceil(Math.max(0, p.hp))}/${p.maxHp}`;
     this.ui.energyText.textContent = `${Math.floor(p.energy)} energy`;
     this.ui.xpText.textContent = `Level ${p.level}`;
-    this.ui.floorText.textContent = `Floor ${this.floor}-${this.room}`;
+    this.ui.floorText.textContent = `Floor ${this.floor}-${this.room} • ${this.currentRoomType}`;
     this.ui.coinText.textContent = `${p.coins}`;
     this.ui.shardText.textContent = `${p.shards}`;
-    this.ui.objective.textContent = this.enemies.length ? `${this.enemies.length} enemies left` : 'Arena clear';
+    this.ui.companionText.textContent = this.companions.length ? `Axolotl Lv.${this.companions[0].level}` : 'None';
+    if (this.state === 'playing') this.ui.objective.textContent = this.enemies.length ? `${this.enemies.length} enemies left` : 'Room clear';
   }
 
   setCodex(text) {
