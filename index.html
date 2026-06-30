@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0d16" />
+    <title>Lava Roguelike: Stormforge Abyss</title>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <main id="hud">
+      <section class="top-left panel">
+        <div class="brand">
+          <div class="logo-mark">🔥</div>
+          <div>
+            <h1>Stormforge Abyss</h1>
+            <span>v0.1 • 3D roguelike prototype</span>
+          </div>
+        </div>
+
+        <div class="stat-row">
+          <strong>HP</strong>
+          <div class="bar"><div id="hpBar" class="fill hp"></div></div>
+          <span id="hpText">100/100</span>
+        </div>
+        <div class="stat-row">
+          <strong>Energy</strong>
+          <div class="bar"><div id="energyBar" class="fill energy"></div></div>
+          <span id="energyText">100 energy</span>
+        </div>
+        <div class="stat-row">
+          <strong>XP</strong>
+          <div class="bar"><div id="xpBar" class="fill xp"></div></div>
+          <span id="xpText">Level 1</span>
+        </div>
+        <div id="objective" class="objective">Start a run</div>
+      </section>
+
+      <section class="top-right">
+        <div class="meta-box panel">
+          <span id="floorText">Floor 1-1</span>
+          <span>🪙 <b id="coinText">0</b></span>
+          <span>💎 <b id="shardText">0</b></span>
+        </div>
+      </section>
+
+      <section class="bottom-left panel controls">
+        <span><strong>WASD</strong> move • <strong>Mouse</strong> aim • <strong>Click</strong> slash</span>
+        <span><strong>Shift</strong> dash • <strong>Q</strong> Thunder Dash • <strong>E</strong> Hyper Beam if unlocked</span>
+        <span><strong>Lock Mouse</strong> gives smoother third-person camera.</span>
+      </section>
+
+      <section class="bottom-right panel">
+        <div id="relicList" class="relic-list"></div>
+      </section>
+
+      <section class="codex-box">
+        <span id="codexLine">Codex Buddy: Welcome to the Abyss. It will probably cheat.</span>
+      </section>
+    </main>
+
+    <section id="menu" class="overlay">
+      <div class="menu-card">
+        <h2>Lava Roguelike</h2>
+        <p>
+          A 3D browser roguelike prototype for <strong>Stormforge Abyss</strong>. Build broken relic combos,
+          dash through enemies, survive weather disasters, and make the Abyss regret giving you loot.
+        </p>
+        <div class="button-row">
+          <button id="startBtn" class="primary-btn">Start Stormblade Run</button>
+          <button id="lockBtn" class="secondary-btn">Lock Mouse</button>
+        </div>
+
+        <div class="menu-grid">
+          <div>
+            <ul class="feature-list">
+              <li>3D arena, third-person camera, WASD movement, mouse aim.</li>
+              <li>M1 slashes, dash, Thunder Dash, unlockable Hyper Beam.</li>
+              <li>Enemies, elites, projectiles, boss room, coins, shards, relic rewards.</li>
+              <li>Weather events: lightning, meteor rain, and ashfall.</li>
+              <li>Permanent upgrades saved in localStorage.</li>
+            </ul>
+          </div>
+          <div class="save-box">
+            <h3>Permanent Progress</h3>
+            <p id="saveStats">Abyss Shards: 0 • Best Floor: 1 • Runs: 0</p>
+            <div class="upgrades-box">
+              <h3>Base Camp Upgrades</h3>
+              <div id="upgradeButtons" class="upgrade-buttons"></div>
+            </div>
+          </div>
+        </div>
+        <p class="small-note">No assets needed yet. Everything is primitive-powered so the prototype stays tiny and GitHub Pages-friendly.</p>
+      </div>
+    </section>
+
+    <section id="reward" class="overlay hidden">
+      <div class="reward-panel">
+        <h2>Choose a Relic</h2>
+        <p>The room is clear. Pick one upgrade and push deeper into the Abyss.</p>
+        <div id="rewardCards" class="reward-cards"></div>
+      </div>
+    </section>
+
+    <section id="gameover" class="overlay hidden">
+      <div class="gameover-card">
+        <h2>Run Ended</h2>
+        <p id="runStats">The Abyss won this round.</p>
+        <div class="button-row">
+          <button id="restartBtn" class="primary-btn">Run It Back</button>
+          <button id="menuBtn" class="secondary-btn">Base Camp</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="toasts"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
