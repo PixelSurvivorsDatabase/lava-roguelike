@@ -15,14 +15,14 @@
           <div class="logo-mark">🔥</div>
           <div>
             <h1>Stormforge Abyss</h1>
-            <span>v0.1 • 3D roguelike prototype</span>
+            <span>v0.2 • Random rooms + shop + companion</span>
           </div>
         </div>
 
         <div class="stat-row">
           <strong>HP</strong>
           <div class="bar"><div id="hpBar" class="fill hp"></div></div>
-          <span id="hpText">100/100</span>
+          <span id="hpText">125/125</span>
         </div>
         <div class="stat-row">
           <strong>Energy</strong>
@@ -42,13 +42,14 @@
           <span id="floorText">Floor 1-1</span>
           <span>🪙 <b id="coinText">0</b></span>
           <span>💎 <b id="shardText">0</b></span>
+          <span>🐾 <b id="companionText">None</b></span>
         </div>
       </section>
 
       <section class="bottom-left panel controls">
         <span><strong>WASD</strong> move • <strong>Mouse</strong> aim • <strong>Click</strong> slash</span>
         <span><strong>Shift</strong> dash • <strong>Q</strong> Thunder Dash • <strong>E</strong> Hyper Beam if unlocked</span>
-        <span><strong>Lock Mouse</strong> gives smoother third-person camera.</span>
+        <span><strong>v0.2:</strong> random room route, Vrotato shop, chaos rooms, Lava Axolotl companion.</span>
       </section>
 
       <section class="bottom-right panel">
@@ -65,8 +66,19 @@
         <h2>Lava Roguelike</h2>
         <p>
           A 3D browser roguelike prototype for <strong>Stormforge Abyss</strong>. Build broken relic combos,
-          dash through enemies, survive weather disasters, and make the Abyss regret giving you loot.
+          dash through enemies, survive weather disasters, buy questionable items, and hatch a tiny monster friend.
         </p>
+
+        <label class="difficulty-row">
+          <span>Rift Difficulty</span>
+          <select id="difficultySelect">
+            <option value="casual">Casual Rift — chill first build</option>
+            <option value="normal">Normal Rift — fair pressure</option>
+            <option value="abyss">Abyss Rift — disrespect mode</option>
+            <option value="skill">Skill Issue Mode — lightning behavior</option>
+          </select>
+        </label>
+
         <div class="button-row">
           <button id="startBtn" class="primary-btn">Start Stormblade Run</button>
           <button id="lockBtn" class="secondary-btn">Lock Mouse</button>
@@ -75,11 +87,11 @@
         <div class="menu-grid">
           <div>
             <ul class="feature-list">
-              <li>3D arena, third-person camera, WASD movement, mouse aim.</li>
-              <li>M1 slashes, dash, Thunder Dash, unlockable Hyper Beam.</li>
-              <li>Enemies, elites, projectiles, boss room, coins, shards, relic rewards.</li>
-              <li>Weather events: lightning, meteor rain, and ashfall.</li>
-              <li>Permanent upgrades saved in localStorage.</li>
+              <li>Random room route: combat, elite, shop, companion, chaos, and boss rooms.</li>
+              <li>Vrotato Chip shop with healing, mystery relics, and Lava Axolotl eggs.</li>
+              <li>Lava Axolotl companion follows you and attacks enemies automatically.</li>
+              <li>Difficulty selector: Casual, Normal, Abyss, and Skill Issue Mode.</li>
+              <li>Permanent upgrades still save with localStorage.</li>
             </ul>
           </div>
           <div class="save-box">
@@ -91,14 +103,14 @@
             </div>
           </div>
         </div>
-        <p class="small-note">No assets needed yet. Everything is primitive-powered so the prototype stays tiny and GitHub Pages-friendly.</p>
+        <p class="small-note">Still primitive-powered and GitHub Pages-friendly. No assets required yet.</p>
       </div>
     </section>
 
     <section id="reward" class="overlay hidden">
       <div class="reward-panel">
-        <h2>Choose a Relic</h2>
-        <p>The room is clear. Pick one upgrade and push deeper into the Abyss.</p>
+        <h2 id="rewardTitle">Choose a Relic</h2>
+        <p id="rewardDesc">The room is clear. Pick one upgrade and push deeper into the Abyss.</p>
         <div id="rewardCards" class="reward-cards"></div>
       </div>
     </section>
