@@ -2,9 +2,9 @@
 
 A 3D browser roguelike prototype built with Three.js + Vite.
 
-You play as the **Riftborn Stormforge**, starting as a Stormblade with dash-heavy combat. Clear arenas, collect Lava Coins and Abyss Shards, choose relics, survive weather disasters, and push toward boss rooms.
+You play as the **Riftborn Stormforge**, starting as a Stormblade with dash-heavy combat. Clear randomized room routes, collect Lava Coins and Abyss Shards, buy questionable items from Vrotato Chip, hatch a Lava Axolotl companion, choose relics, survive weather disasters, and push toward boss rooms.
 
-## v0.1 features
+## v0.2 features
 
 - 3D arena with third-person camera
 - WASD movement and mouse aiming
@@ -12,6 +12,12 @@ You play as the **Riftborn Stormforge**, starting as a Stormblade with dash-heav
 - Shift dash
 - Q Thunder Dash
 - Unlockable E Hyper Beam relic
+- Random room route: combat, elite, shop, companion, chaos, and boss rooms
+- Shop room with Vrotato Chip
+- Lava Axolotl companion prototype
+- Companion nest upgrade rooms
+- Chaos room events
+- Difficulty selector: Casual Rift, Normal Rift, Abyss Rift, and Skill Issue Mode
 - Enemy waves: Ash Slimes, Storm Bats, Rust Drones
 - Elite enemy modifiers
 - Boss room: The Winged Siren
@@ -51,14 +57,6 @@ The production build outputs to `dist/`.
 
 ## Roadmap
 
-### v0.2
-
-- Random connected rooms instead of one arena loop
-- Shop room with Vrotato Chip
-- Lava Gunner and Beast Tamer starter classes
-- More relic combos
-- Companion prototype: Lava Axolotl
-
 ### v0.3
 
 - Proper floor themes
@@ -66,6 +64,7 @@ The production build outputs to `dist/`.
 - Save file menu
 - Boss intro cards
 - More weather disasters
+- First extra starter class: Lava Gunner or Beast Tamer
 
 ### v0.4+
 
